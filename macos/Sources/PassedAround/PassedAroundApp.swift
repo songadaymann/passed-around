@@ -65,7 +65,7 @@ struct ContentView: View {
                 Text(model.status).lineLimit(2).font(.system(size: 12))
                 Spacer()
                 if model.busy || model.publishing || model.connecting || model.loadingTitles { ProgressView().controlSize(.small) }
-                Text("v0.1.0 · Open source").font(.system(size: 11)).foregroundStyle(.secondary)
+                Text("v0.1.1 · Open source").font(.system(size: 11)).foregroundStyle(.secondary)
             }.padding(.horizontal, 20).padding(.vertical, 11).background(Color.white)
         }.foregroundStyle(ink).tint(ink)
         .sheet(isPresented: $showPayload) { payloadSheet }
@@ -187,7 +187,7 @@ struct ContentView: View {
                     TextField("Filter links", text: $model.linkSearch).textFieldStyle(.roundedBorder).frame(width: 160)
                 }.padding(.horizontal, 25).padding(.vertical, 15).disabled(model.publishing)
                 if scan.undecodedMessages > 0 { Text("\(scan.undecodedMessages) messages used an unreadable text format and were skipped. The scan may be incomplete.").font(.system(size: 12)).foregroundStyle(.orange).padding(.horizontal, 25).padding(.bottom, 10) }
-                if scan.links.isEmpty { VStack(spacing: 12) { Image(systemName: "music.note").font(.system(size: 38)); Text("No supported music links found yet.").font(.system(size: 20, weight: .semibold)); Text("Spotify, Apple Music, YouTube, Bandcamp, Deezer, Tidal and SoundCloud links are supported. Playlists and artist profiles are skipped.").font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center) }.frame(maxWidth: .infinity, maxHeight: .infinity).padding(35) }
+                if scan.links.isEmpty { VStack(spacing: 12) { Image(systemName: "music.note").font(.system(size: 38)); Text("No supported music links found yet.").font(.system(size: 20, weight: .semibold)); Text("Spotify, Apple Music, Bandcamp, Deezer, Tidal and SoundCloud links are supported. YouTube, playlists and artist profiles are skipped.").font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center) }.frame(maxWidth: .infinity, maxHeight: .infinity).padding(35) }
                 else {
                     ScrollView {
                         LazyVStack(spacing: 0) {

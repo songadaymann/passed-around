@@ -4,6 +4,10 @@ export const sha256 = async value => [...new Uint8Array(await crypto.subtle.dige
 const randomToken = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const json = (data, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
 class APIError extends Error { constructor(status, message) { super(message); this.status = status; } }
+// Keep legacy video records reversible, but only music-service shares curate
+// the public feed. Metadata/listening links alone do not qualify a release.
+const musicShare = trackID => `EXISTS (SELECT 1 FROM sources music_source WHERE music_source.track_id=${trackID}
+  AND music_source.provenance='shared' AND music_source.platform IN ('spotify','appleMusic','bandcamp','deezer','tidal','soundcloud'))`;
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
@@ -68,10 +72,15 @@ async function ingest(request, env, ctx) {
   await rateLimit(env, `ingest:${group.id}`, 30);
   const body = await bodyJSON(request); onlyKeys(body, ['urls']);
   if (!Array.isArray(body.urls) || body.urls.length < 1 || body.urls.length > 10) throw new APIError(400, 'Send between 1 and 10 music URLs.');
-  const sources = body.urls.map(normalizeMusicURL);
-  if (sources.some(s => !s)) throw new APIError(400, 'One or more links are unsupported. No links were added.');
+  const normalized = body.urls.map(normalizeMusicURL);
+  if (normalized.some(s => !s)) throw new APIError(400, 'One or more links are unsupported. No links were added.');
+  // Older clients can still send mixed batches. Skip videos without losing
+  // the music links in that same batch.
+  const ignored = normalized.filter(s => s.platform === 'youtube').length;
+  const sources = [...new Map(normalized.filter(s => s.platform !== 'youtube').map(s => [s.url, s])).values()];
+  if (!sources.length) return json({ accepted: 0, ignored, message: 'YouTube shares are skipped. Share a link from a music service instead.' }, 202);
   const statements = [];
-  for (const source of new Map(sources.map(s => [s.url, s])).values()) {
+  for (const source of sources) {
     const prior = await env.DB.prepare('SELECT track_id FROM sources WHERE url=?').bind(source.url).first();
     const id = prior?.track_id || (await sha256(source.url)).slice(0, 24);
     if (!prior) {
@@ -86,7 +95,7 @@ async function ingest(request, env, ctx) {
   }
   await env.DB.batch(statements);
   ctx.waitUntil(enrichPending(env));
-  return json({ accepted: sources.length, message: 'Music links saved. Listening links are being matched in the background.' }, 202);
+  return json({ accepted: sources.length, ignored, message: 'Music links saved. Listening links are being matched in the background.' }, 202);
 }
 
 async function feed(url, env) {
@@ -95,7 +104,7 @@ async function feed(url, env) {
   const platform = (url.searchParams.get('platform') || '').slice(0, 30);
   const limit = Math.min(60, Math.max(1, Math.trunc(Number(url.searchParams.get('limit'))) || 24));
   const offset = Math.min(100_000, Math.max(0, Math.trunc(Number(url.searchParams.get('offset'))) || 0));
-  const conditions = ["EXISTS (SELECT 1 FROM shares WHERE track_id=t.id)"];
+  const conditions = ["EXISTS (SELECT 1 FROM shares WHERE track_id=t.id)", musicShare('t.id')];
   const parameters = [];
   if (query) {
     conditions.push("(t.title LIKE ? ESCAPE '\\' OR t.artist LIKE ? ESCAPE '\\')");
@@ -119,12 +128,12 @@ async function feed(url, env) {
 }
 
 async function stats(env) {
-  const row = await env.DB.prepare(`SELECT
-    (SELECT COUNT(DISTINCT track_id) FROM shares) tracks,
-    (SELECT COUNT(DISTINCT collection_id) FROM shares) groups,
-    (SELECT COUNT(*) FROM (SELECT track_id FROM shares GROUP BY track_id HAVING COUNT(*)=1)) rare,
-    (SELECT COUNT(*) FROM shares) connections,
-    (SELECT COUNT(*) FROM tracks WHERE status='pending' AND EXISTS (SELECT 1 FROM shares WHERE track_id=tracks.id)) pending`).first();
+  const row = await env.DB.prepare(`WITH music_shares AS (SELECT * FROM shares WHERE ${musicShare('shares.track_id')}) SELECT
+    (SELECT COUNT(DISTINCT track_id) FROM music_shares) tracks,
+    (SELECT COUNT(DISTINCT collection_id) FROM music_shares) groups,
+    (SELECT COUNT(*) FROM (SELECT track_id FROM music_shares GROUP BY track_id HAVING COUNT(*)=1)) rare,
+    (SELECT COUNT(*) FROM music_shares) connections,
+    (SELECT COUNT(*) FROM tracks WHERE status='pending' AND EXISTS (SELECT 1 FROM music_shares WHERE track_id=tracks.id)) pending`).first();
   return json(row);
 }
 
@@ -170,7 +179,7 @@ async function saveResolution(env, job, result) {
 export async function enrichPending(env) {
   const started = Date.now();
   // A short lease serializes batches, not an entire minute of slow catalog work.
-  // Provider budgets are independent: YouTube/Spotify artwork can progress while
+  // Provider budgets are independent: Spotify artwork can progress while
   // Apple catalog requests wait for their next minute. Stay under 50 external
   // subrequests even on a free Worker; D1 requests have a separate quota.
   const lock = await env.DB.prepare(`INSERT INTO rate_limits(key,window,count) VALUES ('resolver',?,1)
@@ -192,7 +201,9 @@ export async function enrichPending(env) {
   const processNext = async () => {
     const now = Date.now();
     const job = await env.DB.prepare(`UPDATE resolution_jobs SET locked_until=?,attempts=attempts+1
-      WHERE track_id=(SELECT track_id FROM resolution_jobs WHERE available_at<=? AND locked_until<? ORDER BY attempts,available_at LIMIT 1)
+      WHERE track_id=(SELECT track_id FROM resolution_jobs WHERE available_at<=? AND locked_until<?
+        AND EXISTS (SELECT 1 FROM sources WHERE sources.track_id=resolution_jobs.track_id AND provenance='shared' AND platform<>'youtube')
+        ORDER BY attempts,available_at LIMIT 1)
       RETURNING *`).bind(now + 120_000, now, now).first();
     if (!job) return false;
     try {
@@ -225,8 +236,8 @@ async function route(request, env, ctx) {
     const origin = request.headers.get('origin');
     if (origin && origin !== url.origin) throw new APIError(403, 'Cross-origin writes are not allowed.');
   }
-  if (path === '/api/health' && request.method === 'GET') return json({ ok: true, version: '0.1.0' });
-  if (path === '/api/config' && request.method === 'GET') return json({ sourceURL: env.SOURCE_URL, version: '0.1.0', inviteRequired: true });
+  if (path === '/api/health' && request.method === 'GET') return json({ ok: true, version: '0.1.1' });
+  if (path === '/api/config' && request.method === 'GET') return json({ sourceURL: env.SOURCE_URL, version: '0.1.1', inviteRequired: true });
   if (path === '/api/collections' && request.method === 'POST') return register(request, env);
   if (path === '/api/shares' && request.method === 'POST') return ingest(request, env, ctx);
   if (path === '/api/feed' && request.method === 'GET') return feed(url, env);
@@ -234,7 +245,7 @@ async function route(request, env, ctx) {
   if (path === '/api/collection' && request.method === 'DELETE') return removeCollection(request, env);
   if (path === '/api/collection' && request.method === 'GET') {
     const group = await authenticate(request, env);
-    const row = await env.DB.prepare('SELECT COUNT(*) tracks FROM shares WHERE collection_id=?').bind(group.id).first();
+    const row = await env.DB.prepare(`SELECT COUNT(*) tracks FROM shares WHERE collection_id=? AND ${musicShare('shares.track_id')}`).bind(group.id).first();
     return json({ connected: true, tracks: row.tracks });
   }
   if (path.startsWith('/api/')) return json({ error: 'Endpoint not found.' }, 404);

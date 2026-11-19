@@ -1,6 +1,6 @@
 # Recording matching
 
-Original canonical URLs are always retained and labeled `shared`. Additional catalog links are labeled `metadata`. Search destinations are constructed separately and never stored as confirmed availability.
+Accepted original canonical music URLs are retained and labeled `shared`. YouTube shares are skipped by the Mac app and API; legacy YouTube-only records stay hidden from the feed and counts. Short links are resolved before they qualify for the public feed. Additional catalog links are labeled `metadata`. Search destinations are constructed separately and never stored as confirmed availability.
 
 ## Current adapters
 
@@ -9,7 +9,7 @@ Original canonical URLs are always retained and labeled `shared`. Additional cat
 | Spotify | Public embed entity for title/artist/duration/artwork; official oEmbed fallback for title/artwork | Preserve original; offer searches |
 | Apple Music | Public iTunes lookup/search | Exact full normalized title and artist, duration within 2 seconds, track-only |
 | Deezer | Public track/album metadata and search | Same strict recording predicate |
-| YouTube | Official oEmbed for original videos | Uploader is not assumed to be artist; do not automatically merge videos |
+| YouTube | Listening search only | Video shares are excluded; no assumption that every video is music |
 | Bandcamp | Preserve original track/album URL; readable slug fallback | Labeled Bandcamp search; no catalog scraping |
 | Tidal | Preserve original track/album URL | Labeled search |
 | SoundCloud | Original URL and public oEmbed title when available | Labeled search; no title-only merge |
@@ -18,7 +18,7 @@ Spotify's embed-state JSON is **undocumented and may change**. Only the explicit
 
 Version terms such as "live", "remix", "instrumental" and remaster years remain in the normalized title. Duration must be known for both candidates. Matching is deliberately conservative; even these agreements are not a guarantee of identical masters. No fuzzy or first-result matching is used. Albums remain albums and are not expanded into invented track shares. Failed metadata jobs retry with backoff, at most three attempts.
 
-YouTube thumbnails are derived from the validated video ID immediately, before metadata lookup finishes. Other original-provider artwork is saved as soon as it is available. An unavailable/deleted video can still have no usable thumbnail; the UI labels that fallback.
+Original-provider artwork is saved as soon as it is available. The UI explicitly labels unavailable artwork. Legacy video-only metadata jobs are skipped; internal video URL recognition remains for existing alternate listening links.
 
 The resolver uses a 30-second batch lease, three concurrent jobs, up to 36 jobs/pass, bounded fetch timeouts and a shared ceiling of 40 external requests/pass. A separate database budget caps Apple requests at 16 per minute, regardless of how many upload/cron invocations run. A provider-budget deferral does not consume an error retry. Saved metadata/artwork is reused when retrying cross-service matches, so slow catalog searches do not cause repeated cover lookups. Apple originals use the link's storefront instead of assuming US availability.
 

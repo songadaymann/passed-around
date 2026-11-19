@@ -7,10 +7,6 @@ enum MusicTitles {
         let endpoint: String
         switch music.platform {
         case "Spotify": endpoint = "https://open.spotify.com/oembed?url=\(music.url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
-        case "YouTube":
-            var components = URLComponents(string: "https://www.youtube.com/oembed")!
-            components.queryItems = [URLQueryItem(name: "url", value: music.url), URLQueryItem(name: "format", value: "json")]
-            endpoint = components.url!.absoluteString
         case "Apple Music":
             let components = URLComponents(url: original, resolvingAgainstBaseURL: false)
             let id = components?.queryItems?.first(where: { $0.name == "i" })?.value ?? original.lastPathComponent

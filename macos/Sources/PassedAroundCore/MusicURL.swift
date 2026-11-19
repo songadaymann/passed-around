@@ -34,10 +34,6 @@ public enum MusicURLParser {
             if let song, groups(song, "^([0-9]+)$") == nil { return nil }
             return result("https://music.apple.com\(path)\(song.map { "?i=\($0)" } ?? "")", "Apple Music", song != nil || g[0] == "song" ? "track" : "album")
         }
-        if ["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"].contains(host) {
-            let id = host == "youtu.be" ? String(path.dropFirst()) : path == "/watch" ? components.queryItems?.first(where: { $0.name == "v" })?.value : groups(path, "^/(?:shorts|live)/([A-Za-z0-9_-]+)$")?.first
-            if let id, groups(id, "^([A-Za-z0-9_-]{11})$") != nil { return result("https://www.youtube.com/watch?v=\(id)", "YouTube", "video") }
-        }
         if groups(host, "^([a-z0-9-]+)\\.bandcamp\\.com$") != nil, let g = groups(path, "^/(track|album)/([A-Za-z0-9%_-]+)$") {
             return result("https://\(host)\(path)", "Bandcamp", g[0])
         }

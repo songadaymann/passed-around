@@ -133,33 +133,6 @@
     }
   },
   {
-    "id": "sample-5",
-    "title": "Khruangbin & Leon Bridges - Texas Sun (Official Audio)",
-    "artist": "",
-    "artwork": "https://i.ytimg.com/vi/zSWNWWREtsI/hqdefault.jpg",
-    "kind": "video",
-    "durationMs": null,
-    "status": "partial",
-    "groupCount": 3,
-    "publishedAt": "2026-11-18T18:00:00Z",
-    "links": [
-      {
-        "platform": "youtube",
-        "url": "https://www.youtube.com/watch?v=zSWNWWREtsI",
-        "provenance": "shared"
-      }
-    ],
-    "searches": {
-      "spotify": "https://open.spotify.com/search/Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)",
-      "appleMusic": "https://music.apple.com/us/search?term=Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)",
-      "youtube": "https://www.youtube.com/results?search_query=Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)",
-      "bandcamp": "https://bandcamp.com/search?q=Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)&item_type=t",
-      "deezer": "https://www.deezer.com/search/Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)/track",
-      "tidal": "https://listen.tidal.com/search?q=Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)",
-      "soundcloud": "https://soundcloud.com/search/sounds?q=Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)"
-    }
-  },
-  {
     "id": "sample-6",
     "title": "Roads",
     "artist": "Portishead",

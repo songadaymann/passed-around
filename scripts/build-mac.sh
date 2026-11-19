@@ -25,6 +25,8 @@ cp LICENSE "$app_dir/Contents/Resources/LICENSE.txt"
 cp docs/THIRD_PARTY.md "$app_dir/Contents/Resources/THIRD_PARTY.txt"
 codesign --force --sign - --entitlements macos/PassedAround.entitlements "$app_dir"
 codesign --verify --deep --strict "$app_dir"
-ditto -c -k --sequesterRsrc --keepParent "$app_dir" public/downloads/Passed-Around-0.1.0-mac.zip
-(cd public/downloads && shasum -a 256 Passed-Around-0.1.0-mac.zip > SHA256SUMS.txt)
+app_version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' macos/Info.plist)
+archive="Passed-Around-${app_version}-mac.zip"
+ditto -c -k --sequesterRsrc --keepParent "$app_dir" "public/downloads/$archive"
+(cd public/downloads && shasum -a 256 "$archive" > SHA256SUMS.txt)
 printf 'Built %s\n' "$app_dir"

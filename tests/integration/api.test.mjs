@@ -104,31 +104,74 @@ async function artworkHarness(outboundService) {
   return { mf, db, group, upload, waitFor };
 }
 
-test('bulk import processes more than eight videos and supplies thumbnails without provider image metadata', async () => {
-  let lookups = 0;
+test('YouTube shares are skipped in old-client batches and legacy videos stay out of every public count', async () => {
+  const outgoing = [];
   const { mf, db, group, upload, waitFor } = await artworkHarness(async request => {
-    assert.equal(new URL(request.url).hostname, 'www.youtube.com'); lookups++;
-    return Response.json({ title: 'Synthetic video', thumbnail_url: '' });
+    outgoing.push(request.url); throw new Error('Legacy videos must not trigger metadata requests');
+  });
+  const video = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+  const alternate = 'https://www.youtube.com/watch?v=00000000001';
+  try {
+    await db.batch([
+      db.prepare("INSERT INTO collections(id,token_hash) VALUES ('video-only-group','synthetic-hash')"),
+      db.prepare("INSERT INTO tracks(id,title,kind,status) VALUES ('legacy','Unrelated video','video','pending'),('music','Synthetic Song','track','ready')"),
+      db.prepare("INSERT INTO sources(url,track_id,platform,provenance) VALUES (?,'legacy','youtube','shared'),(?,'music','spotify','shared'),(?,'music','youtube','metadata'),(?,'legacy','appleMusic','metadata')").bind(video, spotify, alternate, apple),
+      db.prepare("INSERT INTO shares(collection_id,track_id) VALUES (?,'legacy'),(?,'music'),('video-only-group','legacy')").bind(group.collectionId, group.collectionId),
+      db.prepare("INSERT INTO resolution_jobs(track_id,source_url) VALUES ('legacy',?)").bind(video),
+    ]);
+    for (const query of ['', '?sort=popular', '?sort=rare', '?q=Unrelated', '?platform=youtube', '?limit=1&offset=1']) {
+      const feed = await (await mf.dispatchFetch(`https://test/api/feed${query}`)).json();
+      assert.ok(feed.tracks.every(t => t.id === 'music'));
+      assert.equal(feed.total, query.includes('Unrelated') ? 0 : 1);
+      if (query.includes('offset=1')) assert.equal(feed.tracks.length, 0);
+    }
+    const feed = await (await mf.dispatchFetch('https://test/api/feed')).json();
+    assert.equal(feed.tracks.length, 1);
+    assert.ok(feed.tracks[0].links.some(l => l.url === alternate));
+    assert.ok(feed.tracks[0].searches.youtube);
+    assert.deepEqual(await (await mf.dispatchFetch('https://test/api/stats')).json(), { tracks: 1, groups: 1, rare: 1, connections: 1, pending: 0 });
+    const collection = await (await mf.dispatchFetch('https://test/api/collection', { headers: { Authorization: `Bearer ${group.token}` } })).json();
+    assert.equal(collection.tracks, 1);
+    const skipped = await upload([video, 'https://youtu.be/00000000002', 'https://music.youtube.com/watch?v=00000000003']);
+    assert.equal(skipped.status, 202);
+    assert.deepEqual(await skipped.json(), { accepted: 0, ignored: 3, message: 'YouTube shares are skipped. Share a link from a music service instead.' });
+    const mixed = await upload([spotify, 'https://youtu.be/00000000004']);
+    assert.equal(mixed.status, 202);
+    const result = await mixed.json(); assert.equal(result.accepted, 1); assert.equal(result.ignored, 1);
+    await waitFor(async () => Boolean(await db.prepare("SELECT key FROM rate_limits WHERE key='resolver'").first()));
+    assert.equal((await db.prepare('SELECT COUNT(*) count FROM tracks').first()).count, 2, 'Legacy records are retained, and no new videos are saved');
+    assert.equal((await db.prepare("SELECT attempts FROM resolution_jobs WHERE track_id='legacy'").first()).attempts, 0);
+    assert.deepEqual(outgoing, []);
+  } finally { await mf.dispose(); }
+});
+
+test('bulk import processes more than eight music releases and saves their cover art', async () => {
+  let lookups = 0;
+  const artwork = 'https://i.scdn.co/image/synthetic-cover';
+  const { mf, db, group, upload, waitFor } = await artworkHarness(async request => {
+    assert.equal(new URL(request.url).hostname, 'open.spotify.com'); lookups++;
+    return new Response(`<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { state: { data: { entity: { title: 'Synthetic Song', artists: [{ name: 'A Test Band' }], visualIdentity: { image: [{ url: artwork, maxWidth: 640 }] } } } } } } })}</script>`);
   });
   try {
     const urls = [];
     for (let i = 0; i < 25; i++) {
-      const id = String(i).padStart(11, '0'); const url = `https://www.youtube.com/watch?v=${id}`; urls.push(url);
+      const id = String(i).padStart(22, '0'); const url = `https://open.spotify.com/track/${id}`; urls.push(url);
       await db.batch([
-        db.prepare("INSERT INTO tracks(id,title,kind) VALUES (?,'Finding video details…','video')").bind(id),
-        db.prepare("INSERT INTO sources(url,track_id,platform,provenance) VALUES (?,?,'youtube','shared')").bind(url, id),
+        db.prepare("INSERT INTO tracks(id,title,kind) VALUES (?,'Finding track details…','track')").bind(id),
+        db.prepare("INSERT INTO sources(url,track_id,platform,provenance) VALUES (?,?,'spotify','shared')").bind(url, id),
         db.prepare('INSERT INTO shares(collection_id,track_id) VALUES (?,?)').bind(group.collectionId, id),
         db.prepare('INSERT INTO resolution_jobs(track_id,source_url) VALUES (?,?)').bind(id, url),
       ]);
     }
     const before = await (await mf.dispatchFetch('https://test/api/feed?limit=60')).json();
-    assert.equal(before.tracks.filter(t => t.artwork?.startsWith('https://i.ytimg.com/vi/')).length, 25);
+    assert.equal(before.tracks.length, 25);
     assert.equal((await (await mf.dispatchFetch('https://test/api/stats')).json()).pending, 25);
     assert.equal((await upload([urls[0]])).status, 202);
     await waitFor(async () => (await db.prepare('SELECT COUNT(*) count FROM resolution_jobs').first()).count === 0);
     assert.equal(lookups, 25);
     const after = await (await mf.dispatchFetch('https://test/api/feed?limit=60')).json();
-    assert.ok(after.tracks.every(t => t.artwork && t.title === 'Synthetic video' && t.groupCount === 1));
+    assert.equal(after.tracks.length, 25);
+    assert.ok(after.tracks.every(t => t.artwork === artwork && t.title === 'Synthetic Song' && t.groupCount === 1));
     assert.equal((await (await mf.dispatchFetch('https://test/api/stats')).json()).pending, 0);
   } finally { await mf.dispose(); }
 });

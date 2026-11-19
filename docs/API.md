@@ -16,21 +16,21 @@ Header: `Authorization: Bearer <token>`.
 
 Body: `{"urls":["https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC"]}`.
 
-One to ten supported canonical music URLs. Extra fields, unsupported destinations, userinfo/ports, private message bodies, and non-music hostnames are rejected. The entire batch is validated before writing. Repeated requests are idempotent for a collection/recording pair. Returns 202 with an accepted count; metadata work continues in the background. Ingestion is rate-limited to 30 requests/minute per key.
+One to ten supported canonical music URLs. Extra fields, unsupported destinations, userinfo/ports, private message bodies, and non-music hostnames are rejected. The entire batch is validated before writing. Repeated requests are idempotent for a collection/recording pair. YouTube URLs from older clients are skipped without rejecting other music URLs in the batch. Returns 202 with `accepted` (distinct music URLs) and `ignored` (YouTube input URLs) counts, including `accepted: 0` for all-YouTube batches; metadata work continues in the background. Ingestion is rate-limited to 30 requests/minute per key.
 
 ## GET /api/feed
 
 Query parameters: `sort=recent|popular|rare`, optional `q`, optional `platform`, `limit` (1–60), `offset`.
 
-Returns `tracks`, `total`, and `hasMore`. Each track includes title, artist, kind (`track|album|video`), artwork, status, duration, `groupCount`, publication date, `links` with provenance, and separately labeled `searches`. It never includes collection IDs, chat information, or keys.
+Returns `tracks`, `total`, and `hasMore`. Only releases with a shared music-service source are visible; YouTube-only legacy records and unresolved short links are excluded. Each track includes title, artist, kind (`track|album`), artwork, status, duration, `groupCount`, publication date, `links` with provenance, and separately labeled `searches`. It never includes collection IDs, chat information, or keys.
 
 ## GET /api/stats
 
-Returns aggregate `tracks`, `groups`, `rare` (releases with one contributing collection), `connections` (distinct collection/recording relationships), and `pending` (releases still awaiting initial metadata). Empty registered collections are not included in group counts.
+Returns aggregate `tracks`, `groups`, `rare` (releases with one contributing collection), `connections` (distinct collection/recording relationships), and `pending` (releases still awaiting initial metadata). Counts use the same music-service eligibility as the feed. Empty registered collections and collections with only excluded video shares are not included in group counts.
 
 ## GET /api/collection
 
-Authenticated. Returns connectivity and this collection's current release count.
+Authenticated. Returns connectivity and this collection's current eligible music release count.
 
 ## DELETE /api/collection
 

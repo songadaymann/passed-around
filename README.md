@@ -7,7 +7,7 @@ This is an early, open-source pilot: a native SwiftUI Mac app plus a Cloudflare 
 ## What it does
 
 - Opens the local Messages database **read-only**, after macOS permission and an explicit conversation selection.
-- Extracts recognized Spotify, Apple Music, YouTube, Bandcamp, Deezer, Tidal, and SoundCloud track/album/video URLs. Artist profiles and playlists are skipped. YouTube videos are included for review; the app does not claim every video is music.
+- Extracts recognized Spotify, Apple Music, Bandcamp, Deezer, Tidal, and SoundCloud track/album URLs. YouTube shares, artist profiles and playlists are skipped.
 - Lets you review, select, optionally load song titles from providers, and export or publish canonical music URLs.
 - Uploads **only `{ "urls": [...] }`**, authenticated by a random collection key. No chat names, participant identities, message bodies, original message dates, or local database IDs are uploaded.
 - Counts distinct contributing collections per release. Reposting a song in the same collection does not increase its group count.
@@ -81,7 +81,7 @@ Enter a strong, private invitation when prompted. In the Mac app, enter your HTT
 
 ## Matching limits
 
-See [MATCHING.md](docs/MATCHING.md). This is **not** universal availability verification. The retired Odesli API is not used. Spotify's public embed-state format is an undocumented enhancement with an official oEmbed fallback. Apple/Deezer matches are metadata-based, not guaranteed ISRC identity. Alternate versions remain separate. YouTube uploads are not automatically merged with recordings; original Bandcamp links are preserved without scraping Bandcamp. Search links remain available for all supported services.
+See [MATCHING.md](docs/MATCHING.md). This is **not** universal availability verification. The retired Odesli API is not used. Spotify's public embed-state format is an undocumented enhancement with an official oEmbed fallback. Apple/Deezer matches are metadata-based, not guaranteed ISRC identity. Alternate versions remain separate. YouTube-only imports are excluded from the feed and counts; existing records are retained privately for reversibility. YouTube remains a listening search for music shared from another service. Original Bandcamp links are preserved without scraping Bandcamp. Search links remain available for all supported services.
 
 ## Privacy and security
 

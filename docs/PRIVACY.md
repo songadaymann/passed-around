@@ -6,7 +6,7 @@ The app is sandboxed with network-client, user-selected read-only file, and book
 
 The app lists conversation names, participant counts, and message counts locally so the user can choose a chat. It reads participant phone/email handles from Messages to identify otherwise unnamed groups; those handles stay in memory on the Mac and are not exported or uploaded. It does not request Contacts/address-book access. Message-content scanning uses a parameterized query restricted to the selected chat ID. SQLite is opened with `SQLITE_OPEN_READONLY`; the app never copies the database or modifies messages.
 
-Message text and decoded attributed-body strings are temporary, in-memory values. Recognized URLs are normalized against exact hostname/path allowlists; query strings and fragments are removed except actual song/video identifiers. Only music URLs, local occurrence counts and local last-shared dates remain in the review model. The app retains a folder bookmark and collection keys, not a second message archive. The original Messages database remains under Apple's control.
+Message text and decoded attributed-body strings are temporary, in-memory values. Recognized URLs are normalized against exact hostname/path allowlists; query strings and fragments are removed except actual song identifiers. YouTube URLs are excluded from scans, exports and publication payloads. Only music URLs, local occurrence counts and local last-shared dates remain in the review model. The app retains a folder bookmark and collection keys, not a second message archive. The original Messages database remains under Apple's control.
 
 The pure Swift TypedStream decoder parses bytes without instantiating archived Objective-C objects. Undecodable bodies are counted and surfaced as incomplete-scan warnings. Private data is never sent to a language model.
 
@@ -18,7 +18,7 @@ Local exports are written as URL-only JSON files inside the app's own Applicatio
 
 Scanning and selecting do not use the network. There are distinct network actions:
 
-1. **Load selected song titles:** sends selected, extracted music URLs directly to Spotify/YouTube oEmbed or song IDs to Apple's catalog lookup. This is explicit, optional, memory-cached, and separate from the Passed Around server. No chat context is included. The app labels this action before use.
+1. **Load selected song titles:** sends selected, extracted music URLs directly to Spotify oEmbed or song IDs to Apple's catalog lookup. This is explicit, optional, memory-cached, and separate from the Passed Around server. No chat context is included. The app labels this action before use.
 2. **Connect collection:** registers an anonymous collection using the configured site's pilot invitation, or imports an existing key into macOS Keychain. The server creates a random UUID and random 256-bit token. The invitation is not a music submission.
 3. **Publish selected links:** sends only `{"urls":["https://…"]}` to `POST /api/shares`. A random token is sent as a bearer header. The server rejects extra JSON keys. The local chat ID, name, message text, participants, occurrence counts, and original message dates cannot be encoded by the publication payload type.
 4. **Remove collection:** authenticates with its token and deletes that collection and its contributions.
@@ -28,7 +28,7 @@ Collection credentials are stored in Keychain, not UserDefaults. HTTP redirects 
 
 ## Server storage and public output
 
-D1 stores random collection IDs, SHA-256 token hashes, canonical music URLs, public recording metadata, platform-link provenance, collection/recording relationships, publication times, resolver jobs and rate-limit counters. It has no fields for chat names, participants, message content or original message dates. Group IDs and token hashes are never in the public feed. Exact public `publishedAt` values describe publication to this service, not when someone sent the original message.
+D1 stores random collection IDs, SHA-256 token hashes, canonical music URLs, public recording metadata, platform-link provenance, collection/recording relationships, publication times, resolver jobs and rate-limit counters. It has no fields for chat names, participants, message content or original message dates. Group IDs and token hashes are never in the public feed. Exact public `publishedAt` values describe publication to this service, not when someone sent the original message. Legacy YouTube-only records remain stored but are excluded from the public feed, aggregate counts and metadata work; removing a collection still removes all its contributions, including those hidden records.
 
 The public API returns song metadata, listening links, provenance, aggregate distinct-group counts, and publication dates. Canonical aliases allow an Apple Music link and a Spotify link to contribute to the same recording when a conservative match is found. A collection contributes at most one count per recording.
 

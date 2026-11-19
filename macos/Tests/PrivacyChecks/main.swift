@@ -11,7 +11,10 @@ struct PrivacyChecks {
     func testURLAllowlistAndTrackingRemoval() throws {
         let input = "Keep this private. https://example.com/private?secret=bad https://open.spotify.com/intl-de/track/4uLU6hMCjMI75M1A2tKUQC?si=secret https://youtu.be/dQw4w9WgXcQ?t=12"
         let result = MusicURLParser.extract(from: input)
-        try expect(Set(result.map(\.url)) == ["https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"])
+        try expect(Set(result.map(\.url)) == ["https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC"])
+        for video in ["https://youtu.be/dQw4w9WgXcQ", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "https://m.youtube.com/shorts/dQw4w9WgXcQ", "https://music.youtube.com/watch?v=dQw4w9WgXcQ", "https://youtube.com/live/dQw4w9WgXcQ"] {
+            try expect(MusicURLParser.normalize(video) == nil, "YouTube shares must stay out of scans and payloads")
+        }
         try expect(MusicURLParser.normalize("https://open.spotify.com.evil.test/track/4uLU6hMCjMI75M1A2tKUQC") == nil)
         try expect(MusicURLParser.normalize("https://user:secret@open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC") == nil)
         try expect(MusicURLParser.normalize("https://open.spotify.com/playlist/4uLU6hMCjMI75M1A2tKUQC") == nil)
@@ -20,10 +23,10 @@ struct PrivacyChecks {
     }
 
     func testPublicationTypeCanEncodeOnlyCanonicalURLs() throws {
-        let payload = PublishPayload(urls: ["https://youtu.be/dQw4w9WgXcQ?private=bad", "my friend said this", "https://example.com/private"])
+        let payload = PublishPayload(urls: ["https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=private", "https://youtu.be/dQw4w9WgXcQ?private=bad", "my friend said this", "https://example.com/private"])
         let object = try JSONSerialization.jsonObject(with: payload.json()) as! [String: Any]
         try expect(Set(object.keys) == ["urls"])
-        try expect(object["urls"] as? [String] == ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"])
+        try expect(object["urls"] as? [String] == ["https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC"])
     }
 
     func testTypedStreamExtractsModernAttributedMessagesWithoutUnarchivingObjects() throws {
@@ -53,8 +56,8 @@ struct PrivacyChecks {
         INSERT INTO message(ROWID,text,date) VALUES
           (1,'NEVER UPLOAD THIS https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=secret',816000000000000000),
           (2,'Repeat https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC',816000000000000001),
-          (3,'OTHER CHAT https://youtu.be/dQw4w9WgXcQ',816000000000000002),
-          (4,'Liked https://youtu.be/dQw4w9WgXcQ',816000000000000003);
+          (3,'OTHER CHAT https://open.spotify.com/track/0000000000000000000001',816000000000000002),
+          (4,'Liked https://open.spotify.com/track/0000000000000000000002',816000000000000003);
         UPDATE message SET associated_message_type=2001 WHERE ROWID=4;
         INSERT INTO chat_message_join VALUES(1,1),(1,2),(2,3),(1,4);
         """
@@ -71,7 +74,7 @@ struct PrivacyChecks {
         try expect(result.links.first?.occurrences == 2)
         let exported = try PublishPayload(urls: result.links.map(\.id)).json(pretty: true)
         let text = String(decoding: exported, as: UTF8.self)
-        try expect(!text.contains("PRIVATE")); try expect(!text.contains("NEVER")); try expect(!text.contains("secret")); try expect(!text.contains("dQw4w9WgXcQ"))
+        try expect(!text.contains("PRIVATE")); try expect(!text.contains("NEVER")); try expect(!text.contains("secret")); try expect(!text.contains("0000000000000000000001")); try expect(!text.contains("0000000000000000000002"))
         let after = try Data(contentsOf: file)
         try expect(before == after)
     }
