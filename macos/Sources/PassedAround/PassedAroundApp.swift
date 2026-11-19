@@ -169,6 +169,7 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(chat.displayName).font(.system(size: 29, weight: .bold)).tracking(-0.9).lineLimit(2)
                         Text("\(chat.participants) people · \(chat.messageCount.formatted()) messages on this Mac").font(.system(size: 13)).foregroundStyle(.secondary)
+                        if !chat.participantsLocal.isEmpty { Text(chat.participantsLocal).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled) }
                     }
                     Spacer()
                     Button { Task { await model.scanSelected(keepSelection: model.scan != nil) } } label: { Label(model.scan == nil ? "Find music links" : "Scan again", systemImage: "magnifyingglass") }.buttonStyle(.borderedProminent).controlSize(.large).disabled(model.busy || model.publishing)

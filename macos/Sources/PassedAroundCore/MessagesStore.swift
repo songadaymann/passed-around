@@ -8,7 +8,8 @@ public struct ChatSummary: Identifiable, Hashable, Sendable {
     public let participants: Int
     public let messageCount: Int
     public let latest: Date?
-    public var displayName: String { name.isEmpty ? "Conversation \(id)" : name }
+    public let participantsLocal: String
+    public var displayName: String { name.isEmpty ? (participantsLocal.isEmpty ? "Conversation \(id)" : participantsLocal) : name }
 }
 
 public struct FoundMusicLink: Identifiable, Hashable, Sendable {
@@ -79,10 +80,12 @@ public final class MessagesStore {
     }
 
     public func chats() throws -> [ChatSummary] {
+        let hasHandles = try columns(in: "handle").contains("id")
+        let localParticipants = hasHandles ? "(SELECT GROUP_CONCAT(h.id, ', ') FROM handle h JOIN chat_handle_join p ON p.handle_id=h.ROWID WHERE p.chat_id=c.ROWID)" : "''"
         let statement = try prepare("""
         SELECT c.ROWID,COALESCE(c.display_name,''),
           (SELECT COUNT(*) FROM chat_handle_join h WHERE h.chat_id=c.ROWID),
-          COUNT(m.ROWID),MAX(m.date)
+          COUNT(m.ROWID),MAX(m.date),\(localParticipants)
         FROM chat c LEFT JOIN chat_message_join j ON j.chat_id=c.ROWID
         LEFT JOIN message m ON m.ROWID=j.message_id
         GROUP BY c.ROWID ORDER BY MAX(m.date) DESC
@@ -92,7 +95,7 @@ public final class MessagesStore {
         repeat {
             code = sqlite3_step(statement)
             if code == SQLITE_ROW {
-                result.append(ChatSummary(id: sqlite3_column_int64(statement, 0), name: text(statement, 1), participants: Int(sqlite3_column_int64(statement, 2)) + 1, messageCount: Int(sqlite3_column_int64(statement, 3)), latest: appleDate(sqlite3_column_double(statement, 4))))
+                result.append(ChatSummary(id: sqlite3_column_int64(statement, 0), name: text(statement, 1), participants: Int(sqlite3_column_int64(statement, 2)) + 1, messageCount: Int(sqlite3_column_int64(statement, 3)), latest: appleDate(sqlite3_column_double(statement, 4)), participantsLocal: text(statement, 5)))
             }
         } while code == SQLITE_ROW
         guard code == SQLITE_DONE else { throw MessagesError.database("The chat list could not be read.") }

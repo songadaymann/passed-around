@@ -44,10 +44,12 @@ struct PrivacyChecks {
         let sql = """
         CREATE TABLE chat(ROWID INTEGER PRIMARY KEY,display_name TEXT);
         CREATE TABLE chat_handle_join(chat_id INTEGER,handle_id INTEGER);
+        CREATE TABLE handle(ROWID INTEGER PRIMARY KEY,id TEXT);
         CREATE TABLE message(ROWID INTEGER PRIMARY KEY,text TEXT,attributedBody BLOB,date INTEGER,associated_message_type INTEGER DEFAULT 0,is_system_message INTEGER DEFAULT 0);
         CREATE TABLE chat_message_join(chat_id INTEGER,message_id INTEGER);
         INSERT INTO chat VALUES(1,'LOCAL PRIVATE NAME'),(2,'OTHER PRIVATE CHAT');
         INSERT INTO chat_handle_join VALUES(1,1),(1,2),(1,3);
+        INSERT INTO handle VALUES(1,'PRIVATE-PERSON@example.test'),(2,'OTHER-PERSON@example.test'),(3,'ANOTHER-PERSON@example.test');
         INSERT INTO message(ROWID,text,date) VALUES
           (1,'NEVER UPLOAD THIS https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=secret',816000000000000000),
           (2,'Repeat https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC',816000000000000001),
@@ -62,6 +64,7 @@ struct PrivacyChecks {
         let store = try MessagesStore(databaseURL: file)
         let chats = try store.chats()
         try expect(chats.first(where: { $0.id == 1 })?.participants == 4)
+        try expect(chats.first(where: { $0.id == 1 })?.participantsLocal.contains("PRIVATE-PERSON") == true)
         let result = try store.scan(chatID: 1)
         try expect(result.scannedMessages == 2)
         try expect(result.links.count == 1)

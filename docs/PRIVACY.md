@@ -4,7 +4,7 @@
 
 The app is sandboxed with network-client, user-selected read-only file, and bookmark entitlements. It requests a Messages-folder grant through the system picker. macOS may additionally require Full Disk Access. Neither mechanism grants "music links only" access: the underlying database contains multiple conversations.
 
-The app lists conversation names, participant **counts**, and message counts locally so the user can choose a chat. It does not query participant names or contact handles. Message-content scanning uses a parameterized query restricted to the selected chat ID. SQLite is opened with `SQLITE_OPEN_READONLY`; the app never copies the database or modifies messages.
+The app lists conversation names, participant counts, and message counts locally so the user can choose a chat. It reads participant phone/email handles from Messages to identify otherwise unnamed groups; those handles stay in memory on the Mac and are not exported or uploaded. It does not request Contacts/address-book access. Message-content scanning uses a parameterized query restricted to the selected chat ID. SQLite is opened with `SQLITE_OPEN_READONLY`; the app never copies the database or modifies messages.
 
 Message text and decoded attributed-body strings are temporary, in-memory values. Recognized URLs are normalized against exact hostname/path allowlists; query strings and fragments are removed except actual song/video identifiers. Only music URLs, local occurrence counts and local last-shared dates remain in the review model. The app retains a folder bookmark and collection keys, not a second message archive. The original Messages database remains under Apple's control.
 
