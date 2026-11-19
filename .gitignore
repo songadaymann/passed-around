@@ -1,0 +1,10 @@
+node_modules/
+.wrangler/
+.local/
+macos/.build/
+build/
+public/downloads/*
+!public/downloads/.gitkeep
+.DS_Store
+.dev.vars
+*.log

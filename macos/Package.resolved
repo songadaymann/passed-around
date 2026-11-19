@@ -1,0 +1,14 @@
+{
+  "originHash" : "bf81ecff3f7f036c34eef60b9811b0ac67ce347a523c0287b3a636df850001e2",
+  "pins" : [
+    {
+      "identity" : "madrid",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mattt/Madrid.git",
+      "state" : {
+        "revision" : "5245d83ce866666ac3cfcfddde49298dbd4b2732"
+      }
+    }
+  ],
+  "version" : 3
+}

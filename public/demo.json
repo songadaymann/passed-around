@@ -1,0 +1,194 @@
+[
+  {
+    "id": "sample-1",
+    "title": "Never Gonna Give You Up",
+    "artist": "Rick Astley",
+    "artwork": "https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e02255e131abc1410833be95673",
+    "kind": "track",
+    "durationMs": 213573,
+    "status": "ready",
+    "groupCount": 12,
+    "publishedAt": "2026-11-19T15:30:00Z",
+    "links": [
+      {
+        "platform": "spotify",
+        "url": "https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC",
+        "provenance": "shared"
+      },
+      {
+        "platform": "appleMusic",
+        "url": "https://music.apple.com/us/album/never-gonna-give-you-up/1559885420?i=1559885421",
+        "provenance": "metadata"
+      }
+    ],
+    "searches": {
+      "spotify": "https://open.spotify.com/search/Rick%20Astley%20Never%20Gonna%20Give%20You%20Up",
+      "appleMusic": "https://music.apple.com/us/search?term=Rick%20Astley%20Never%20Gonna%20Give%20You%20Up",
+      "youtube": "https://www.youtube.com/results?search_query=Rick%20Astley%20Never%20Gonna%20Give%20You%20Up",
+      "bandcamp": "https://bandcamp.com/search?q=Rick%20Astley%20Never%20Gonna%20Give%20You%20Up&item_type=t",
+      "deezer": "https://www.deezer.com/search/Rick%20Astley%20Never%20Gonna%20Give%20You%20Up/track",
+      "tidal": "https://listen.tidal.com/search?q=Rick%20Astley%20Never%20Gonna%20Give%20You%20Up",
+      "soundcloud": "https://soundcloud.com/search/sounds?q=Rick%20Astley%20Never%20Gonna%20Give%20You%20Up"
+    }
+  },
+  {
+    "id": "sample-2",
+    "title": "Dreams - 2004 Remaster",
+    "artist": "Fleetwood Mac",
+    "artwork": "https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e02e52a59a28efa4773dd2bfe1b",
+    "kind": "track",
+    "durationMs": 257800,
+    "status": "ready",
+    "groupCount": 1,
+    "publishedAt": "2026-11-19T14:15:00Z",
+    "links": [
+      {
+        "platform": "spotify",
+        "url": "https://open.spotify.com/track/0ofHAoxe9vBkTCp2UQIavz",
+        "provenance": "shared"
+      },
+      {
+        "platform": "appleMusic",
+        "url": "https://music.apple.com/us/album/dreams-2004-remaster/1792535281?i=1792535295",
+        "provenance": "metadata"
+      },
+      {
+        "platform": "deezer",
+        "url": "https://www.deezer.com/track/67549262",
+        "provenance": "metadata"
+      }
+    ],
+    "searches": {
+      "spotify": "https://open.spotify.com/search/Fleetwood%20Mac%20Dreams%20-%202004%20Remaster",
+      "appleMusic": "https://music.apple.com/us/search?term=Fleetwood%20Mac%20Dreams%20-%202004%20Remaster",
+      "youtube": "https://www.youtube.com/results?search_query=Fleetwood%20Mac%20Dreams%20-%202004%20Remaster",
+      "bandcamp": "https://bandcamp.com/search?q=Fleetwood%20Mac%20Dreams%20-%202004%20Remaster&item_type=t",
+      "deezer": "https://www.deezer.com/search/Fleetwood%20Mac%20Dreams%20-%202004%20Remaster/track",
+      "tidal": "https://listen.tidal.com/search?q=Fleetwood%20Mac%20Dreams%20-%202004%20Remaster",
+      "soundcloud": "https://soundcloud.com/search/sounds?q=Fleetwood%20Mac%20Dreams%20-%202004%20Remaster"
+    }
+  },
+  {
+    "id": "sample-3",
+    "title": "Weird Fishes / Arpeggi",
+    "artist": "Radiohead",
+    "artwork": "https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02de3c04b5fc750b68899b20a9",
+    "kind": "track",
+    "durationMs": 318186,
+    "status": "ready",
+    "groupCount": 5,
+    "publishedAt": "2026-11-18T22:10:00Z",
+    "links": [
+      {
+        "platform": "spotify",
+        "url": "https://open.spotify.com/track/4wajJ1o7jWIg62YqpkHC7S",
+        "provenance": "shared"
+      },
+      {
+        "platform": "appleMusic",
+        "url": "https://music.apple.com/us/album/weird-fishes-arpeggi/1109714933?i=1109715168",
+        "provenance": "metadata"
+      },
+      {
+        "platform": "deezer",
+        "url": "https://www.deezer.com/track/138546809",
+        "provenance": "metadata"
+      }
+    ],
+    "searches": {
+      "spotify": "https://open.spotify.com/search/Radiohead%20Weird%20Fishes%20%2F%20Arpeggi",
+      "appleMusic": "https://music.apple.com/us/search?term=Radiohead%20Weird%20Fishes%20%2F%20Arpeggi",
+      "youtube": "https://www.youtube.com/results?search_query=Radiohead%20Weird%20Fishes%20%2F%20Arpeggi",
+      "bandcamp": "https://bandcamp.com/search?q=Radiohead%20Weird%20Fishes%20%2F%20Arpeggi&item_type=t",
+      "deezer": "https://www.deezer.com/search/Radiohead%20Weird%20Fishes%20%2F%20Arpeggi/track",
+      "tidal": "https://listen.tidal.com/search?q=Radiohead%20Weird%20Fishes%20%2F%20Arpeggi",
+      "soundcloud": "https://soundcloud.com/search/sounds?q=Radiohead%20Weird%20Fishes%20%2F%20Arpeggi"
+    }
+  },
+  {
+    "id": "sample-4",
+    "title": "Get Lucky (feat. Pharrell Williams and Nile Rodgers)",
+    "artist": "Daft Punk, Pharrell Williams, Nile Rodgers",
+    "artwork": "https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e029b9b36b0e22870b9f542d937",
+    "kind": "track",
+    "durationMs": 369626,
+    "status": "ready",
+    "groupCount": 1,
+    "publishedAt": "2026-11-18T20:45:00Z",
+    "links": [
+      {
+        "platform": "spotify",
+        "url": "https://open.spotify.com/track/69kOkLUCkxIZYexIgSG8rq",
+        "provenance": "shared"
+      }
+    ],
+    "searches": {
+      "spotify": "https://open.spotify.com/search/Daft%20Punk%2C%20Pharrell%20Williams%2C%20Nile%20Rodgers%20Get%20Lucky%20(feat.%20Pharrell%20Williams%20and%20Nile%20Rodgers)",
+      "appleMusic": "https://music.apple.com/us/search?term=Daft%20Punk%2C%20Pharrell%20Williams%2C%20Nile%20Rodgers%20Get%20Lucky%20(feat.%20Pharrell%20Williams%20and%20Nile%20Rodgers)",
+      "youtube": "https://www.youtube.com/results?search_query=Daft%20Punk%2C%20Pharrell%20Williams%2C%20Nile%20Rodgers%20Get%20Lucky%20(feat.%20Pharrell%20Williams%20and%20Nile%20Rodgers)",
+      "bandcamp": "https://bandcamp.com/search?q=Daft%20Punk%2C%20Pharrell%20Williams%2C%20Nile%20Rodgers%20Get%20Lucky%20(feat.%20Pharrell%20Williams%20and%20Nile%20Rodgers)&item_type=t",
+      "deezer": "https://www.deezer.com/search/Daft%20Punk%2C%20Pharrell%20Williams%2C%20Nile%20Rodgers%20Get%20Lucky%20(feat.%20Pharrell%20Williams%20and%20Nile%20Rodgers)/track",
+      "tidal": "https://listen.tidal.com/search?q=Daft%20Punk%2C%20Pharrell%20Williams%2C%20Nile%20Rodgers%20Get%20Lucky%20(feat.%20Pharrell%20Williams%20and%20Nile%20Rodgers)",
+      "soundcloud": "https://soundcloud.com/search/sounds?q=Daft%20Punk%2C%20Pharrell%20Williams%2C%20Nile%20Rodgers%20Get%20Lucky%20(feat.%20Pharrell%20Williams%20and%20Nile%20Rodgers)"
+    }
+  },
+  {
+    "id": "sample-5",
+    "title": "Khruangbin & Leon Bridges - Texas Sun (Official Audio)",
+    "artist": "",
+    "artwork": "https://i.ytimg.com/vi/zSWNWWREtsI/hqdefault.jpg",
+    "kind": "video",
+    "durationMs": null,
+    "status": "partial",
+    "groupCount": 3,
+    "publishedAt": "2026-11-18T18:00:00Z",
+    "links": [
+      {
+        "platform": "youtube",
+        "url": "https://www.youtube.com/watch?v=zSWNWWREtsI",
+        "provenance": "shared"
+      }
+    ],
+    "searches": {
+      "spotify": "https://open.spotify.com/search/Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)",
+      "appleMusic": "https://music.apple.com/us/search?term=Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)",
+      "youtube": "https://www.youtube.com/results?search_query=Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)",
+      "bandcamp": "https://bandcamp.com/search?q=Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)&item_type=t",
+      "deezer": "https://www.deezer.com/search/Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)/track",
+      "tidal": "https://listen.tidal.com/search?q=Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)",
+      "soundcloud": "https://soundcloud.com/search/sounds?q=Khruangbin%20%26%20Leon%20Bridges%20-%20Texas%20Sun%20(Official%20Audio)"
+    }
+  },
+  {
+    "id": "sample-6",
+    "title": "Roads",
+    "artist": "Portishead",
+    "artwork": "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/c1/71/93/c1719342-df7d-e9c5-c87c-53dae5afb289/00042282855329.rgb.jpg/600x600bb.jpg",
+    "kind": "track",
+    "durationMs": 303973,
+    "status": "ready",
+    "groupCount": 2,
+    "publishedAt": "2026-11-17T23:00:00Z",
+    "links": [
+      {
+        "platform": "appleMusic",
+        "url": "https://music.apple.com/us/album/roads/1440653096?i=1440653203",
+        "provenance": "shared"
+      },
+      {
+        "platform": "deezer",
+        "url": "https://www.deezer.com/track/982668",
+        "provenance": "metadata"
+      }
+    ],
+    "searches": {
+      "spotify": "https://open.spotify.com/search/Portishead%20Roads",
+      "appleMusic": "https://music.apple.com/us/search?term=Portishead%20Roads",
+      "youtube": "https://www.youtube.com/results?search_query=Portishead%20Roads",
+      "bandcamp": "https://bandcamp.com/search?q=Portishead%20Roads&item_type=t",
+      "deezer": "https://www.deezer.com/search/Portishead%20Roads/track",
+      "tidal": "https://listen.tidal.com/search?q=Portishead%20Roads",
+      "soundcloud": "https://soundcloud.com/search/sounds?q=Portishead%20Roads"
+    }
+  }
+]

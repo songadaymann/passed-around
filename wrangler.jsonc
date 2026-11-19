@@ -1,0 +1,32 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "passed-around",
+	"main": "worker/index.mjs",
+	"account_id": "a79a1faef6e8f94566f3320429d54006",
+	"compatibility_date": "2026-11-19",
+	"workers_dev": true,
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS",
+		"run_worker_first": true
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "passed-around",
+			"database_id": "bf00005b-cfff-4e58-8e34-8054c564688a",
+			"migrations_dir": "migrations"
+		}
+	],
+	"triggers": {
+		"crons": [
+			"* * * * *"
+		]
+	},
+	"vars": {
+		"SOURCE_URL": "https://github.com/songadaymann/passed-around"
+	},
+	"observability": {
+		"enabled": false
+	}
+}
