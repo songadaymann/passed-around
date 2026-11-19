@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeMusicURL, isRecordingMatch, safeArtwork, platformSearches } from '../worker/music.mjs';
+import { normalizeMusicURL, isRecordingMatch, safeArtwork, platformSearches, immediateArtwork } from '../worker/music.mjs';
 
 test('URL boundary strips tracking while retaining actual recording IDs', () => {
   assert.equal(normalizeMusicURL('https://open.spotify.com/intl-de/track/4uLU6hMCjMI75M1A2tKUQC?si=private#fragment').url, 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC');
@@ -36,4 +36,11 @@ test('searches are encoded separately and image hosts are restricted', () => {
   assert.equal(safeArtwork('https://evil.test/spy'), null);
   assert.equal(safeArtwork('javascript:alert(1)'), null);
   assert.equal(safeArtwork('https://i.scdn.co/image/abc'), 'https://i.scdn.co/image/abc');
+});
+
+test('YouTube artwork is available from the canonical ID before metadata finishes', () => {
+  assert.equal(immediateArtwork('https://youtu.be/dQw4w9WgXcQ?si=private'), 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
+  assert.equal(immediateArtwork('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
+  assert.equal(immediateArtwork('https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ'), null);
+  assert.equal(immediateArtwork('https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC'), null);
 });

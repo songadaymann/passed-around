@@ -26,7 +26,7 @@ Returns `tracks`, `total`, and `hasMore`. Each track includes title, artist, kin
 
 ## GET /api/stats
 
-Returns aggregate `tracks`, `groups`, `rare` (releases with one contributing collection) and `connections` (distinct collection/recording relationships). Empty registered collections are not included in group counts.
+Returns aggregate `tracks`, `groups`, `rare` (releases with one contributing collection), `connections` (distinct collection/recording relationships), and `pending` (releases still awaiting initial metadata). Empty registered collections are not included in group counts.
 
 ## GET /api/collection
 

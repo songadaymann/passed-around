@@ -18,7 +18,13 @@ Spotify's embed-state JSON is **undocumented and may change**. Only the explicit
 
 Version terms such as "live", "remix", "instrumental" and remaster years remain in the normalized title. Duration must be known for both candidates. Matching is deliberately conservative; even these agreements are not a guarantee of identical masters. No fuzzy or first-result matching is used. Albums remain albums and are not expanded into invented track shares. Failed metadata jobs retry with backoff, at most three attempts.
 
-The resolver takes a database lock for at most one pass/minute, resolves at most eight releases/pass and uses bounded fetch timeouts. Each release makes at most one Apple request/pass, staying below Apple's documented approximate 20 calls/minute. D1 retains pending jobs for later scheduled passes, so large first imports take time to enrich. The original link can be opened immediately. Local explicit Apple title lookups are paced separately.
+YouTube thumbnails are derived from the validated video ID immediately, before metadata lookup finishes. Other original-provider artwork is saved as soon as it is available. An unavailable/deleted video can still have no usable thumbnail; the UI labels that fallback.
+
+The resolver uses a 30-second batch lease, three concurrent jobs, up to 36 jobs/pass, bounded fetch timeouts and a shared ceiling of 40 external requests/pass. A separate database budget caps Apple requests at 16 per minute, regardless of how many upload/cron invocations run. A provider-budget deferral does not consume an error retry. Saved metadata/artwork is reused when retrying cross-service matches, so slow catalog searches do not cause repeated cover lookups. Apple originals use the link's storefront instead of assuming US availability.
+
+D1 retains pending jobs for later passes. The page shows pending metadata progress and refreshes the already-loaded results automatically, including after loading additional pages. Local explicit Apple title lookups are paced separately.
+
+For repairing an existing import, maintainers can run `node scripts/backfill-artwork.mjs https://their-site` to prepare public-metadata-only updates, then add `--apply` to apply them to the configured D1 database. It reads only the public feed and source-provider metadata, does not open Messages or read collection credentials, and does not alter group contributions. Cross-service searches are skipped during this repair.
 
 ## References checked 2026-11-19
 

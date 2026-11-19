@@ -3,6 +3,7 @@ const platforms = { spotify: 'Spotify', appleMusic: 'Apple Music', youtube: 'You
 const symbols = { spotify: '◉', appleMusic: '♫', youtube: '▶', bandcamp: '▰', deezer: '▥', tidal: '◆', soundcloud: '☁' };
 let state = { sort: 'recent', query: '', demo: false, tracks: [], offset: 0, hasMore: false };
 let controller; let demoTracks; let debounce;
+let loading = false; let pendingMetadata = 0; let refreshAt = 0;
 
 function el(tag, attributes = {}, children = []) {
   const node = document.createElement(tag);
@@ -22,8 +23,9 @@ function externalLink(url, attributes, children = []) {
 const palette = [['#b9a1dd', '#8d86b9'], ['#e8a77c', '#bd6a5f'], ['#d6e780', '#8fa981'], ['#9db9da', '#657f9f'], ['#e4a9c6', '#bd6e8a'], ['#e5cd82', '#ba9656']];
 function placeholder(track) {
   const index = [...track.id].reduce((sum, c) => sum + c.charCodeAt(0), 0) % palette.length;
-  const cover = el('div', { class: 'artwork-placeholder' }, [el('div', { class: 'cover-record' }, [el('span', { text: '♫' })])]);
+  const cover = el('div', { class: 'artwork-placeholder', 'aria-label': track.status === 'pending' ? 'Artwork is being found' : 'No artwork available' }, [el('div', { class: 'cover-record' }, [el('span', { text: '♫' })])]);
   cover.style.setProperty('--cover-a', palette[index][0]); cover.style.setProperty('--cover-b', palette[index][1]);
+  cover.append(el('span', { class: 'artwork-status', text: track.status === 'pending' ? 'Finding artwork…' : 'Artwork unavailable' }));
   return cover;
 }
 
@@ -55,7 +57,7 @@ function songCard(track) {
     ]));
   }
   body.append(known);
-  if (track.status === 'pending') body.append(el('p', { class: 'matching-note', text: 'Matching more listening links in the background.' }));
+  if (track.status === 'pending') body.append(el('p', { class: 'matching-note', text: 'Finding song details and artwork.' }));
   else if (!track.artist) body.append(el('p', { class: 'matching-note', text: 'Original link kept. Other services are searches.' }));
   const searches = Object.entries(track.searches || {}).filter(([platform]) => platforms[platform] && !byPlatform.has(platform));
   if (searches.length) {
@@ -84,9 +86,15 @@ async function updateStats(signal) {
   if (state.demo) stats = { tracks: demoTracks.length, groups: 18, rare: demoTracks.filter(t => t.groupCount === 1).length };
   else stats = await fetchJSON('/api/stats', signal);
   for (const key of ['tracks', 'groups', 'rare']) $(`#stat-${key}`).textContent = stats[key].toLocaleString();
+  pendingMetadata = state.demo ? 0 : stats.pending || 0;
+  const progress = $('#metadata-progress');
+  progress.hidden = pendingMetadata === 0;
+  progress.textContent = pendingMetadata ? `Still finding titles and artwork for ${pendingMetadata.toLocaleString()} shared ${pendingMetadata === 1 ? 'link' : 'links'}. This page updates automatically.` : '';
 }
 
 async function load({ more = false, quietly = false } = {}) {
+  if (quietly && loading) return;
+  loading = true;
   controller?.abort(); controller = new AbortController(); const signal = controller.signal;
   $('#demo-banner').hidden = !state.demo;
   $('#feed-label').textContent = state.demo ? 'Illustrative sample collection' : 'The live collection';
@@ -104,8 +112,16 @@ async function load({ more = false, quietly = false } = {}) {
       tracks = [...tracks].sort((a, b) => state.sort === 'popular' ? b.groupCount - a.groupCount : state.sort === 'rare' ? a.groupCount - b.groupCount : b.publishedAt.localeCompare(a.publishedAt));
       result = { tracks, hasMore: false };
     } else {
-      const params = new URLSearchParams({ sort: state.sort, q: state.query, offset: more ? state.offset : 0 });
-      result = await fetchJSON(`/api/feed?${params}`, signal);
+      // Refresh the pages the listener already loaded, including after More.
+      // A background update must not collapse the collection back to 24 cards.
+      const wanted = quietly ? Math.max(24, state.offset) : 24;
+      const pages = [];
+      for (let offset = 0; offset < wanted; offset += 60) {
+        const params = new URLSearchParams({ sort: state.sort, q: state.query, offset: more ? state.offset : offset, limit: Math.min(60, wanted - offset) });
+        pages.push(fetchJSON(`/api/feed?${params}`, signal));
+      }
+      const loaded = await Promise.all(pages);
+      result = { tracks: loaded.flatMap(page => page.tracks), hasMore: loaded.at(-1).hasMore };
     }
     if (signal.aborted) return;
     state.tracks = more ? [...state.tracks, ...result.tracks] : result.tracks;
@@ -120,7 +136,10 @@ async function load({ more = false, quietly = false } = {}) {
     if (!more && !quietly) $('#songs').replaceChildren();
     showMessage('The collection couldn’t be loaded. Your music hasn’t gone anywhere.', true);
   } finally {
-    if (!signal.aborted) { $('#songs').setAttribute('aria-busy', 'false'); $('#load-more').disabled = false; }
+    if (!signal.aborted) {
+      loading = false; refreshAt = Date.now() + (pendingMetadata ? 10_000 : 30_000);
+      $('#songs').setAttribute('aria-busy', 'false'); $('#load-more').disabled = false;
+    }
   }
 }
 
@@ -154,6 +173,8 @@ const dialog = $('#privacy-dialog');
 document.querySelectorAll('[data-open-privacy]').forEach(button => button.addEventListener('click', () => dialog.showModal()));
 $('.dialog-close').addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', event => { if (event.target === dialog && (event.clientX < dialog.getBoundingClientRect().left || event.clientX > dialog.getBoundingClientRect().right || event.clientY < dialog.getBoundingClientRect().top || event.clientY > dialog.getBoundingClientRect().bottom)) dialog.close(); });
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !state.demo && !state.hasMore) load({ quietly: true }); });
-setInterval(() => { if (!document.hidden && !state.demo && !state.query && state.offset <= 24) load({ quietly: true }); }, 30_000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !state.demo) load({ quietly: true }); });
+setInterval(() => {
+  if (!document.hidden && !state.demo && !loading && document.activeElement !== $('#search') && Date.now() >= refreshAt) load({ quietly: true });
+}, 5000);
 load();

@@ -64,6 +64,15 @@ export function safeArtwork(input) {
   } catch { return null; }
 }
 
+export function immediateArtwork(sourceURL) {
+  const source = normalizeMusicURL(sourceURL);
+  return source?.platform === 'youtube' ? `https://i.ytimg.com/vi/${source.id}/hqdefault.jpg` : null;
+}
+
+export class ProviderDeferredError extends Error {
+  constructor(retryAt) { super('Provider lookup is waiting for its request budget.'); this.retryAt = retryAt; }
+}
+
 async function request(url, { json = true, timeout = 3500, ...options } = {}) {
   const response = await fetch(url, {
     ...options, signal: AbortSignal.timeout(timeout), redirect: 'manual',
@@ -88,9 +97,11 @@ async function request(url, { json = true, timeout = 3500, ...options } = {}) {
   return json ? JSON.parse(text) : text;
 }
 
-export async function expandMusicURL(source) {
+export async function expandMusicURL(source, beforeRequest) {
   let current = normalizeMusicURL(source);
   for (let step = 0; current?.platform === 'shortlink' && step < 4; step++) {
+    const retryAt = await beforeRequest?.(new URL(current.url));
+    if (retryAt) throw new ProviderDeferredError(retryAt);
     const response = await fetch(current.url, { redirect: 'manual', signal: AbortSignal.timeout(5000) });
     await response.body?.cancel();
     if (![301, 302, 303, 307, 308].includes(response.status)) return null;
@@ -104,13 +115,13 @@ export async function expandMusicURL(source) {
 function fallback(source) {
   let title = source.id.replace(/[-_]/g, ' ');
   if (source.platform !== 'bandcamp' && source.platform !== 'soundcloud') title = `Shared ${source.kind === 'video' ? 'video' : source.kind} on ${PLATFORMS[source.platform] || 'a music service'}`;
-  return { title: title.slice(0, 250), artist: '', durationMs: null, artwork: null, kind: source.kind };
+  return { title: title.slice(0, 250), artist: '', durationMs: null, artwork: immediateArtwork(source.url), kind: source.kind };
 }
 
-async function spotify(source) {
+async function spotify(source, lookup = request) {
   // Spotify's embed state is an undocumented enhancement. oEmbed is the fallback.
   try {
-    const html = await request(`https://open.spotify.com/embed/${source.kind}/${source.id}`, { json: false });
+    const html = await lookup(`https://open.spotify.com/embed/${source.kind}/${source.id}`, { json: false });
     const script = html.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)?.[1];
     const entity = script && JSON.parse(script)?.props?.pageProps?.state?.data?.entity;
     if (entity?.title) {
@@ -122,8 +133,8 @@ async function spotify(source) {
         kind: source.kind,
       };
     }
-  } catch { /* Keep only the allowlisted metadata below. */ }
-  const data = await request(`https://open.spotify.com/oembed?url=${encodeURIComponent(source.url)}`);
+  } catch (error) { if (error instanceof ProviderDeferredError) throw error; }
+  const data = await lookup(`https://open.spotify.com/oembed?url=${encodeURIComponent(source.url)}`);
   return { ...fallback(source), title: String(data.title || '').slice(0, 250) || fallback(source).title, artwork: safeArtwork(data.thumbnail_url) };
 }
 
@@ -136,8 +147,9 @@ function appleResult(item) {
   };
 }
 
-async function apple(source) {
-  const data = await request(`https://itunes.apple.com/lookup?id=${encodeURIComponent(source.id)}&country=US`);
+async function apple(source, lookup = request) {
+  const country = new URL(source.url).pathname.split('/')[1].toUpperCase();
+  const data = await lookup(`https://itunes.apple.com/lookup?id=${encodeURIComponent(source.id)}&country=${country}`);
   const item = data.results?.find(r => String(r.trackId || r.collectionId) === source.id);
   if (!item) throw new Error('Apple metadata unavailable');
   return { ...appleResult(item), kind: source.kind };
@@ -148,55 +160,63 @@ function deezerResult(item) {
     artwork: safeArtwork(item.album?.cover_big || item.cover_big), url: item.link };
 }
 
-async function deezer(source) {
-  const data = await request(`https://api.deezer.com/${source.kind}/${source.id}`);
+async function deezer(source, lookup = request) {
+  const data = await lookup(`https://api.deezer.com/${source.kind}/${source.id}`);
   if (data.error) throw new Error('Deezer metadata unavailable');
   return { ...deezerResult(data), kind: source.kind };
 }
 
-async function youtube(source) {
-  const data = await request(`https://www.youtube.com/oembed?url=${encodeURIComponent(source.url)}&format=json`);
+async function youtube(source, lookup = request) {
+  const data = await lookup(`https://www.youtube.com/oembed?url=${encodeURIComponent(source.url)}&format=json`);
   // The uploader is not necessarily the recording artist. Do not infer identity.
-  return { ...fallback(source), title: String(data.title).slice(0, 250), artwork: safeArtwork(data.thumbnail_url) };
+  return { ...fallback(source), title: String(data.title).slice(0, 250), artwork: safeArtwork(data.thumbnail_url) || immediateArtwork(source.url) };
 }
 
-async function soundcloud(source) {
-  const data = await request(`https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(source.url)}`);
+async function soundcloud(source, lookup = request) {
+  const data = await lookup(`https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(source.url)}`);
   return { ...fallback(source), title: String(data.title || fallback(source).title).slice(0, 250) };
 }
 
-export async function resolveMusic(sourceURL) {
-  const source = await expandMusicURL(sourceURL);
+export async function resolveMusic(sourceURL, { cachedMetadata, beforeRequest } = {}) {
+  const source = await expandMusicURL(sourceURL, beforeRequest);
   if (!source) throw new Error('Unsupported music destination');
+  const lookup = async (url, options) => {
+    const retryAt = await beforeRequest?.(new URL(url));
+    if (retryAt) throw new ProviderDeferredError(retryAt);
+    return request(url, options);
+  };
   const adapter = { spotify, appleMusic: apple, deezer, youtube, soundcloud }[source.platform];
-  let metadata = fallback(source); let metadataFailed = false;
-  try { if (adapter) metadata = await adapter(source); } catch { metadataFailed = true; }
+  let metadata = cachedMetadata || fallback(source); let metadataFailed = false; let deferredUntil = 0;
+  try { if (!cachedMetadata && adapter) metadata = await adapter(source, lookup); }
+  catch (error) { metadataFailed = true; if (error instanceof ProviderDeferredError) deferredUntil = error.retryAt; }
   const links = [{ ...source, provenance: 'shared' }];
   // No catalog scraping, no retired Odesli API, no title-only matching.
   if (source.kind === 'track' && metadata.artist && metadata.durationMs) {
     const query = encodeURIComponent(`${metadata.artist} ${metadata.title}`);
     if (source.platform !== 'appleMusic') {
       try {
-        const data = await request(`https://itunes.apple.com/search?term=${query}&entity=song&country=US&limit=10`);
+        const data = await lookup(`https://itunes.apple.com/search?term=${query}&entity=song&country=US&limit=10`);
         const candidates = (data.results || []).map(appleResult).filter(item => isRecordingMatch(metadata, item));
         if (candidates.length) {
           const match = normalizeMusicURL(candidates[0].url);
           if (match) links.push({ ...match, provenance: 'metadata' });
         }
-      } catch { metadataFailed = true; }
+      } catch (error) { metadataFailed = true; if (error instanceof ProviderDeferredError) deferredUntil = Math.max(deferredUntil, error.retryAt); }
     }
     if (source.platform !== 'deezer') {
       try {
-        const data = await request(`https://api.deezer.com/search?q=${query}&limit=25`);
+        const data = await lookup(`https://api.deezer.com/search?q=${query}&limit=25`);
         const candidates = (data.data || []).map(deezerResult).filter(item => isRecordingMatch(metadata, item));
         if (candidates.length) {
           const match = normalizeMusicURL(candidates[0].url);
           if (match) links.push({ ...match, provenance: 'metadata' });
         }
-      } catch { /* Optional service. Preserve original links regardless. */ }
+      } catch (error) {
+        if (error instanceof ProviderDeferredError) { metadataFailed = true; deferredUntil = Math.max(deferredUntil, error.retryAt); }
+      }
     }
   }
-  return { ...metadata, links, status: metadataFailed || !metadata.artist ? 'partial' : 'ready', retry: metadataFailed };
+  return { ...metadata, links, status: metadataFailed || !metadata.artist ? 'partial' : 'ready', retry: metadataFailed, deferredUntil };
 }
 
 export function platformSearches(title, artist = '') {

@@ -1,4 +1,4 @@
-import { normalizeMusicURL, platformSearches, resolveMusic } from './music.mjs';
+import { immediateArtwork, normalizeMusicURL, platformSearches, ProviderDeferredError, resolveMusic } from './music.mjs';
 
 export const sha256 = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(b => b.toString(16).padStart(2, '0')).join('');
 const randomToken = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -76,7 +76,7 @@ async function ingest(request, env, ctx) {
     const id = prior?.track_id || (await sha256(source.url)).slice(0, 24);
     if (!prior) {
       const label = source.platform === 'bandcamp' ? source.id.replace(/-/g, ' ') : `Finding ${source.kind === 'video' ? 'video' : source.kind} details…`;
-      statements.push(env.DB.prepare('INSERT OR IGNORE INTO tracks(id,title,kind) VALUES (?,?,?)').bind(id, label, source.kind));
+      statements.push(env.DB.prepare('INSERT OR IGNORE INTO tracks(id,title,kind,artwork_url) VALUES (?,?,?,?)').bind(id, label, source.kind, immediateArtwork(source.url)));
       statements.push(env.DB.prepare("INSERT INTO sources(url,track_id,platform,provenance) VALUES (?,?,?,'shared') ON CONFLICT(url) DO UPDATE SET provenance='shared'").bind(source.url, id, source.platform));
       statements.push(env.DB.prepare('INSERT OR IGNORE INTO resolution_jobs(track_id,source_url) VALUES (?,?)').bind(id, source.url));
     } else {
@@ -111,7 +111,7 @@ async function feed(url, env) {
   const ids = result.results.map(row => row.id);
   const links = ids.length ? (await env.DB.prepare(`SELECT track_id,platform,url,provenance FROM sources WHERE track_id IN (${ids.map(() => '?').join(',')}) ORDER BY provenance DESC`).bind(...ids).all()).results : [];
   return json({ tracks: result.results.map(row => ({
-    id: row.id, title: row.title, artist: row.artist, artwork: row.artwork_url,
+    id: row.id, title: row.title, artist: row.artist, artwork: row.artwork_url || links.filter(l => l.track_id === row.id).map(l => immediateArtwork(l.url)).find(Boolean) || null,
     kind: row.kind, durationMs: row.duration_ms, status: row.status, groupCount: row.group_count,
     publishedAt: row.latest, links: links.filter(l => l.track_id === row.id).map(({ platform, url, provenance }) => ({ platform, url, provenance })),
     searches: platformSearches(row.title, row.artist),
@@ -123,7 +123,8 @@ async function stats(env) {
     (SELECT COUNT(DISTINCT track_id) FROM shares) tracks,
     (SELECT COUNT(DISTINCT collection_id) FROM shares) groups,
     (SELECT COUNT(*) FROM (SELECT track_id FROM shares GROUP BY track_id HAVING COUNT(*)=1)) rare,
-    (SELECT COUNT(*) FROM shares) connections`).first();
+    (SELECT COUNT(*) FROM shares) connections,
+    (SELECT COUNT(*) FROM tracks WHERE status='pending' AND EXISTS (SELECT 1 FROM shares WHERE track_id=tracks.id)) pending`).first();
   return json(row);
 }
 
@@ -158,7 +159,9 @@ async function saveResolution(env, job, result) {
       ON CONFLICT(url) DO UPDATE SET track_id=excluded.track_id,provenance=CASE WHEN sources.provenance='shared' THEN 'shared' ELSE excluded.provenance END`)
       .bind(link.url, target, link.platform, link.provenance));
   }
-  if (result.retry && job.attempts < 3 && target === job.track_id) {
+  if (result.deferredUntil && target === job.track_id) {
+    statements.push(env.DB.prepare('UPDATE resolution_jobs SET available_at=?,locked_until=0,attempts=MAX(0,attempts-1) WHERE track_id=?').bind(result.deferredUntil, job.track_id));
+  } else if (result.retry && job.attempts < 3 && target === job.track_id) {
     statements.push(env.DB.prepare('UPDATE resolution_jobs SET available_at=?,locked_until=0 WHERE track_id=?').bind(Date.now() + 300_000 * job.attempts, job.track_id));
   } else statements.push(env.DB.prepare('DELETE FROM resolution_jobs WHERE track_id=?').bind(job.track_id));
   await env.DB.batch(statements);
@@ -166,24 +169,52 @@ async function saveResolution(env, job, result) {
 
 export async function enrichPending(env) {
   const started = Date.now();
-  // One resolver per minute, at most eight Apple calls per pass. This keeps the
-  // no-key catalog lookup below its documented approximate 20 calls/minute.
+  // A short lease serializes batches, not an entire minute of slow catalog work.
+  // Provider budgets are independent: YouTube/Spotify artwork can progress while
+  // Apple catalog requests wait for their next minute. Stay under 50 external
+  // subrequests even on a free Worker; D1 requests have a separate quota.
   const lock = await env.DB.prepare(`INSERT INTO rate_limits(key,window,count) VALUES ('resolver',?,1)
     ON CONFLICT(key) DO UPDATE SET window=excluded.window WHERE rate_limits.window<? RETURNING key`)
-    .bind(started + 60_000, started).first();
+    .bind(started + 30_000, started).first();
   if (!lock) return;
-  for (let i = 0; i < 8 && Date.now() - started < 13_000; i++) {
+  let requestsLeft = 40;
+  const beforeRequest = async url => {
+    if (requestsLeft <= 0) return Date.now() + 60_000;
+    if (url.hostname === 'itunes.apple.com') {
+      const window = Math.floor(Date.now() / 60_000) * 60;
+      const permit = await env.DB.prepare(`INSERT INTO rate_limits(key,window,count) VALUES ('provider:apple',?,1)
+        ON CONFLICT(key) DO UPDATE SET window=excluded.window,count=CASE WHEN rate_limits.window=excluded.window THEN rate_limits.count+1 ELSE 1 END
+        WHERE rate_limits.window<>excluded.window OR rate_limits.count<16 RETURNING count`).bind(window).first();
+      if (!permit) return (window + 60) * 1000;
+    }
+    requestsLeft--; return 0;
+  };
+  const processNext = async () => {
     const now = Date.now();
     const job = await env.DB.prepare(`UPDATE resolution_jobs SET locked_until=?,attempts=attempts+1
       WHERE track_id=(SELECT track_id FROM resolution_jobs WHERE available_at<=? AND locked_until<? ORDER BY attempts,available_at LIMIT 1)
       RETURNING *`).bind(now + 120_000, now, now).first();
-    if (!job) break;
-    try { await saveResolution(env, job, await resolveMusic(job.source_url)); }
-    catch {
+    if (!job) return false;
+    try {
+      const track = await env.DB.prepare('SELECT * FROM tracks WHERE id=?').bind(job.track_id).first();
+      const cachedMetadata = track?.artwork_url && !/^(Finding |Shared (?:track|album|video) on )/.test(track.title) ? {
+        title: track.title, artist: track.artist, durationMs: track.duration_ms, artwork: track.artwork_url, kind: track.kind,
+      } : undefined;
+      await saveResolution(env, job, await resolveMusic(job.source_url, { cachedMetadata, beforeRequest }));
+    } catch (error) {
+      if (error instanceof ProviderDeferredError) {
+        await env.DB.prepare('UPDATE resolution_jobs SET available_at=?,locked_until=0,attempts=MAX(0,attempts-1) WHERE track_id=?').bind(error.retryAt, job.track_id).run();
+        return true;
+      }
       await env.DB.prepare("UPDATE tracks SET status='partial' WHERE id=?").bind(job.track_id).run();
       if (job.attempts >= 3) await env.DB.prepare('DELETE FROM resolution_jobs WHERE track_id=?').bind(job.track_id).run();
       else await env.DB.prepare('UPDATE resolution_jobs SET available_at=?,locked_until=0 WHERE track_id=?').bind(Date.now() + 300_000 * job.attempts, job.track_id).run();
     }
+    return true;
+  };
+  for (let processed = 0; processed < 36 && requestsLeft > 0 && Date.now() - started < 12_000; processed += 3) {
+    const batch = await Promise.all([processNext(), processNext(), processNext()]);
+    if (!batch.some(Boolean)) break;
   }
   await env.DB.prepare("DELETE FROM rate_limits WHERE key<>'resolver' AND window<?").bind(Math.floor(Date.now() / 1000) - 86_400).run();
 }
